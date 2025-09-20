@@ -1,4 +1,4 @@
-# Course Assignment
+# Parallelized Model Training 
 
 ## Parallelize the training of a simple NN model, implemented in numpy and MPI.
 - Works for any number of processes.
