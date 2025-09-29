@@ -67,7 +67,7 @@ def main():
         output_size=1,
         activation="relu",
         learning_rate=1e-2,   # not used directly in your mpiMLP update; lr is passed below
-        random_seed=42
+        random_seed=42,
     )
 
     # 3) Train with mpiMLP using MPIDD under the hood
@@ -85,10 +85,11 @@ def main():
         batch_portion=0.2,
         patience=100,
         lr_decay=0.5,
+        save_fig = "training_history.png"
     )
 
     # 4) Evaluate on test set (global MSE computed via reductions inside mpi_compute_MSE_root)
-    X_test, y_test = load_test_arrays("test.csv")
+    X_test, y_test = load_test_arrays("train.csv")
     test_mse = trainer.mpi_compute_MSE_root(X_test, y_test)
     test_rmse = trainer.mpi_compute_MSE_root(X_test, y_test)
 

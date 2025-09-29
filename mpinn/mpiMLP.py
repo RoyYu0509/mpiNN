@@ -2,6 +2,7 @@ from .mlp import MLP, ActivationFunction
 from .mpiDataDistribution import MPIDD
 import numpy as np
 from mpi4py import MPI
+import matplotlib.pyplot as plt
 
 class mpiMLP:
     def __init__(self, model: MLP):
@@ -11,6 +12,8 @@ class mpiMLP:
         self.SIZE = self.COMM.Get_size()
         self.X_val = None
         self.y_val = None
+
+
 
     def mpiSGD(self,
                # Data args
@@ -24,7 +27,9 @@ class mpiMLP:
                lr_decay: float = 0.5,
                report_per: int = 5000,
                lr_resch_stepsize: int = 5000,
-               grad_clip: int = 1e2):
+               grad_clip: int = 1e2,
+               save_fig: str = None
+               ):
         patience_counter = 0
         best_data_loss = np.inf
         training_loss_his = []
@@ -45,29 +50,47 @@ class mpiMLP:
         X = X.to_numpy()
         y = y.to_numpy()
 
+        # enforce numeric dtype (prevents silent object/mixed issues)
+        X = X.astype(np.float64, copy=False)
+        y = y.astype(np.float64, copy=False)
+
         # RNG once (per-rank deterministic)
         rng = np.random.default_rng(self.RANK + 12345)
 
-        # Pick out a validationa data set
-        valid_size = int(np.ceil(max(1, valid_portion * n_local)))
-        # keep validation ≤ half, but never eat the last training sample
-        if n_local <= 1:
-            valid_size = 0
-        else:
-            valid_size = min(max(1, valid_size), n_local - 1)  # ≤ n_local-1
+        n_local = X.shape[0]
+        valid_size = 0 if n_local <= 1 else min(max(1, int(np.ceil(valid_portion * n_local))), n_local - 1)
+        perm = rng.permutation(n_local)
+        val_idx, tr_idx = perm[:valid_size], perm[valid_size:]
 
-        # Log the splited data sets
-        self.X_val = X[:valid_size];
-        X = X[valid_size:]
-        self.y_val = y[:valid_size].reshape(-1, 1);
-        y = y[valid_size:].reshape(-1, 1)
-        # recompute after split
+        self.X_val = X[val_idx].astype(np.float64, copy=False)
+        self.y_val = y[val_idx].reshape(-1, 1).astype(np.float64, copy=False)
+        X = X[tr_idx].astype(np.float64, copy=False)
+        y = y[tr_idx].reshape(-1, 1).astype(np.float64, copy=False)
         n_local = X.shape[0]
 
         # Compute batch size (supports fraction or absolute integer)
         batch_size = int(np.ceil(max(1, batch_portion * n_local)))
         # Clamp to [1, n_local], and handle tiny shards
         batch_size = max(1, min(batch_size, n_local))
+
+        # def global_percentiles(x: np.ndarray, qs=(0, 50, 90, 95, 99, 99.5, 99.9)):
+        #     # Build a shared histogram per rank, then allreduce
+        #     # Simple version: compute local percentiles and gather to root for inspection
+        #     loc = np.percentile(x, qs)
+        #     all_loc = None
+        #     if self.RANK == 0:
+        #         all_loc = np.empty((self.SIZE, len(qs)), dtype=np.float64)
+        #     self.COMM.Gather(loc, all_loc, root=0)
+        #     if self.RANK == 0:
+        #         print("[DIAG] y percentiles per rank (qs", qs, "):")
+        #         for r in range(self.SIZE):
+        #             print(f"  rank {r}: {all_loc[r]}")
+        #         # crude global: take min over ranks for low qs, max for high qs
+        #         print("[DIAG] min over ranks at each q:", all_loc.min(axis=0))
+        #         print("[DIAG] max over ranks at each q:", all_loc.max(axis=0))
+        #
+        # global_percentiles(y.ravel(), qs=(0, 50, 90, 95, 99, 99.5, 99.9))
+        # global_percentiles(self.y_val.ravel(), qs=(0, 50, 90, 95, 99, 99.5, 99.9))
 
         # Training loop
         print()
@@ -129,7 +152,8 @@ class mpiMLP:
 
             # Compute the training & validation loss value on rank 0
             # All procs = None, except for rank 0
-            train_loss = self.mpi_compute_MSE_root(X, y)
+            train_loss = self.mpi_compute_MSE_root(X_bat, y_bat)
+
             val_loss = self.mpi_compute_MSE_root(self.X_val, self.y_val)
             losses = np.array([0.0, 0.0], dtype='d')
 
@@ -163,12 +187,31 @@ class mpiMLP:
                 patience_counter += 1
             if patience_counter >= patience:
                 print()
-                print(f"Early Stopping Triggered on Rank {self.RANK}...")
+                print(f"Early Stopping Triggered on Rank {self.RANK} at iter {epoch}...")
                 print()
                 break
         print()
         print(f"Finished Training on Rank {self.RANK}...")
         print()
+        
+        # --- PLOT AND SAVE FIGURE ---
+        if save_fig is not None:
+            train_rmse = np.sqrt(training_loss_his)
+            val_rmse = np.sqrt(validation_loss_his)
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(train_rmse, label="Train RMSE")
+            plt.plot(val_rmse, label="Validation RMSE")
+            plt.xlabel("Epoch / Iteration")
+            plt.ylabel("RMSE")
+            plt.title("Training History: RMSE vs Iteration")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(save_fig, dpi=300)
+            plt.close()
+            print(f"Training history plot saved as '{save_fig}'")
+        
         return training_loss_his, validation_loss_his
 
     def mpi_compute_MSE_root(self, X, y):

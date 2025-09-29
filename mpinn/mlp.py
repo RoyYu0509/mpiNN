@@ -126,7 +126,7 @@ class MLP:
         n = X.shape[0]
 
         # Output layer gradients
-        dz2 = output - y
+        dz2 = 2.0 * (output - y)
         dW2 = (1 / n) * np.dot(self.a1.T, dz2)
         db2 = (1 / n) * np.sum(dz2, axis=0, keepdims=True)
 

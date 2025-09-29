@@ -9,4 +9,5 @@
 Clone this repo and run the toy example: `mpiexec -l -np 3 python -u -m tests.testMpiTraining`
 
 ## Note:
+Use MPICH
 Use Python 3.11

@@ -111,7 +111,7 @@ class MPIDD:
                 self.service_incoming()
 
             # Sending SAFE when we hear from root
-            req = self.COMM.isend(self.RANK, dest=0, tag=SAFE)
+            req = self.COMM.send(self.RANK, dest=0, tag=SAFE)
             self.pending_reqs.append(req)
 
         # Synchronization:
