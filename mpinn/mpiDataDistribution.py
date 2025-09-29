@@ -195,10 +195,10 @@ class MPIDD:
             # ALL Procs enter Distribution Round
             self.mpi_distribute_from_one_to_all(chunk)
 
-            # Root finished processing this chunk, report
-            if self.RANK == 0:
-                print(f"Process {self.RANK} finished {root_p_counter}th loading round")
-                root_p_counter += 1
+            ## Root finished processing this chunk, report
+            # if self.RANK == 0:
+            #     print(f"Process {self.RANK} finished {root_p_counter}th loading round")
+            #     root_p_counter += 1
         return
 
 

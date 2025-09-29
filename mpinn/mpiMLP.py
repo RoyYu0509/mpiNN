@@ -44,6 +44,7 @@ class mpiMLP:
         self.COMM.Barrier()
         print()
         print(f"Finished Distributing Data on proc {self.RANK}.........", flush=True)
+        print(f"Rank {self.RANK} has {n_local} rows of data")
         print()
 
         # To numpy

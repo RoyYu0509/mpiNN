@@ -90,6 +90,7 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
 # ------------------------------------------------------------- #
 
 def main():
+    act_name = "relu"
     if RANK == 0:
         print("[Rank 0] Starting preprocessing pipeline...")
         train_path, test_path, feature_cols = preprocess_pipeline(
@@ -112,7 +113,7 @@ def main():
         input_size=input_size,
         hidden_size=hidden_size,
         output_size=1,
-        activation="relu",
+        activation=act_name,
         learning_rate=1e-3,
         random_seed=42
     )
@@ -124,19 +125,27 @@ def main():
         readin_chunksize=5000,
         valid_portion=0.15,
         lr=1e-3,
-        epochs=2000,
-        batch_portion=0.3,
-        patience=40,
+        epochs=100,
+        batch_portion=0.05,
+        patience=20,
         lr_decay=0.6,
-        report_per=50,
-        lr_resch_stepsize=100,
-        save_fig="results/training_history.png"
+        report_per=1,
+        lr_resch_stepsize=10,
+        save_fig=f"results/training_history_{act_name}.png"
     )
 
     # Test evaluation
     test_df = pd.read_csv(test_path)
     X_test = test_df[feature_cols].to_numpy(dtype=float)
     y_test = test_df["total_amount"].to_numpy(dtype=float).reshape(-1, 1)
+    
+    df = pd.DataFrame({
+    "epoch": np.arange(1, len(train_losses) + 1),  # add epoch index if needed
+    "train_loss": train_losses,
+    "val_loss": val_losses
+    })
+
+    df.to_csv(f"loss_record_{act_name}.csv", index=False)
 
     test_rmse = trainer.compute_RMSE(X_test, y_test)
 
@@ -146,6 +155,7 @@ def main():
         print(f"Val RMSE   (last): {np.sqrt(val_losses[-1]):.4f}")
         print(f"Test RMSE:        {test_rmse:.4f}")
         print("================================\n")
+    
 
 if __name__ == "__main__":
     main()
