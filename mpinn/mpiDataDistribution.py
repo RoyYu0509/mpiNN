@@ -141,8 +141,8 @@ class MPIDD:
         MPI.Request.Waitall([r for r in self.pending_reqs if isinstance(r, MPI.Request)])
 
         # FIX: guard when local_data may still be None
-        rows = 0 if self.local_data is None else self.local_data.shape[0]
-        print(f"[Rank {self.RANK}] have received {rows} rows of data")
+        # rows = 0 if self.local_data is None else self.local_data.shape[0]
+        # print(f"[Rank {self.RANK}] have received {rows} rows of data")
 
 
     def mpi_load_in_and_distribute(self, target_col="total_amount", shuffle=True):
