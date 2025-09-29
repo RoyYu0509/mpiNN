@@ -153,9 +153,9 @@ class mpiMLP:
 
             # Compute the training & validation loss value on rank 0
             # All procs = None, except for rank 0
-            train_loss = self.mpi_compute_MSE_root(X_bat, y_bat)
+            train_loss = self.mpi_compute_MSE(X_bat, y_bat)
 
-            val_loss = self.mpi_compute_MSE_root(self.X_val, self.y_val)
+            val_loss = self.mpi_compute_MSE(self.X_val, self.y_val)
             losses = np.array([0.0, 0.0], dtype='d')
 
             # Boardcast the loss
@@ -197,25 +197,26 @@ class mpiMLP:
         
         # --- PLOT AND SAVE FIGURE ---
         if save_fig is not None:
-            train_rmse = np.sqrt(training_loss_his)
-            val_rmse = np.sqrt(validation_loss_his)
+            if self.RANK == 0:
+                train_rmse = np.sqrt(training_loss_his)
+                val_rmse = np.sqrt(validation_loss_his)
 
-            plt.figure(figsize=(10, 6))
-            plt.plot(train_rmse, label="Train RMSE")
-            plt.plot(val_rmse, label="Validation RMSE")
-            plt.xlabel("Epoch / Iteration")
-            plt.ylabel("RMSE")
-            plt.title("Training History: RMSE vs Iteration")
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig(save_fig, dpi=300)
-            plt.close()
-            print(f"Training history plot saved as '{save_fig}'")
+                plt.figure(figsize=(10, 6))
+                plt.plot(train_rmse, label="Train RMSE")
+                plt.plot(val_rmse, label="Validation RMSE", alpha=0.6)
+                plt.xlabel("Epoch / Iteration")
+                plt.ylabel("RMSE")
+                plt.title("Training History: RMSE vs Iteration")
+                plt.legend()
+                plt.grid(True)
+                plt.tight_layout()
+                plt.savefig(save_fig, dpi=300)
+                plt.close()
+                print(f"Training history plot saved as '{save_fig}'")
         
         return training_loss_his, validation_loss_his
 
-    def mpi_compute_MSE_root(self, X, y):
+    def mpi_compute_MSE(self, X, y):
         y_est = self.model.forward(X)
         err = (y_est - y).ravel()
         n_local = int(err.size)
@@ -236,7 +237,7 @@ class mpiMLP:
         # Ensure column vector shape for y
         y_test = y_test if y_test.ndim == 2 else y_test.reshape(-1, 1)
         # All procs compute local MSE and agg to rank 0
-        test_mse = self.mpi_compute_MSE_root(X_test, y_test)
+        test_mse = self.mpi_compute_MSE(X_test, y_test)
         # Rank 0 boardcast MSE to all procs
         buf = np.array([0.0], dtype=np.float64)
         if self.RANK == 0:

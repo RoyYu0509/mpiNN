@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from mpi4py import MPI
+import gc
 
 # Import your classes
 from mpinn.mpiDataDistribution import MPIDD
@@ -84,8 +85,9 @@ def preprocess_nytaxi(raw_path="nytaxi2022.csv", out_train="nytaxi_train.csv", o
 
 
 
-def main():
-    act_name = "tanh"
+def experiment_arc(act_name, batch_portion):
+    act_name = act_name
+    batch_portion = batch_portion
     if RANK == 0:
         print("zero")
         train_path, test_path, feature_cols = preprocess_nytaxi(
@@ -115,18 +117,26 @@ def main():
 
     # Train with MPI
     trainer = mpiMLP(model)
+
+    save_fig = f"results/bat_size{batch_portion}/{act_name}/training_history_{act_name}.png"
+
+    if RANK == 0:
+        os.makedirs(os.path.dirname(save_fig), exist_ok=True)
+    # optionally sync so workers don’t race on first write
+    COMM.Barrier()
+
     train_losses, val_losses = trainer.mpiSGD(
         file_path=train_path,
         readin_chunksize=5000,
         valid_portion=0.15,
         lr=1e-3,
         epochs=100,
-        batch_portion=0.05,
+        batch_portion=batch_portion,
         patience=20,
         lr_decay=0.6,
         report_per=1,
         lr_resch_stepsize=10,
-        save_fig=f"results/training_history_{act_name}.png"
+        save_fig=save_fig
     )
 
     # Test evaluation
@@ -140,7 +150,12 @@ def main():
     "val_loss": val_losses
     })
 
-    df.to_csv(f"loss_record_{act_name}.csv", index=False)
+    csv_path = f"results/bat_size{batch_portion}/{act_name}/loss_record_{act_name}.csv"
+    if RANK == 0:
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    COMM.Barrier()
+    df.to_csv(csv_path, index=False)
+
 
     test_rmse = trainer.compute_RMSE(X_test, y_test)
 
@@ -150,6 +165,22 @@ def main():
         print(f"Val RMSE   (last): {np.sqrt(val_losses[-1]):.4f}")
         print(f"Test RMSE:        {test_rmse:.4f}")
         print("================================\n")
+
+    # Clean up phase
+    # --- CLEANUP (end of experiment iteration) ---
+    try:
+        import matplotlib.pyplot as plt
+        plt.close('all')           # close any figures created when saving plots
+    except Exception:
+        pass
+
+    # Drop large references
+    del trainer, model, train_losses, val_losses, test_df, X_test, y_test, df
+
+    gc.collect()                   # force Python GC
+
+    COMM.Barrier()                 # sync ranks so all have cleaned up before next run
+
     
 
 if __name__ == "__main__":
