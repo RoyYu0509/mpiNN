@@ -25,10 +25,11 @@ if __name__ == "__main__":
     for portion in bat_por_list:
         for act_func in act_func_list:
             # Run experiment
-            train_time, train_rmse, validation_rmse, test_rmse = experiment(act_name=act_func, batch_portion=portion)
+            train_time, train_rmse, validation_rmse, test_rmse = experiment(act_name=act_func, batch_portion=portion, proc_num=process_number)
             # Store metrics
             if RANK == 0:  # only root collects to avoid duplicates
                 rows.append({
+                    "process_num": process_number,
                     "act_func": act_func,
                     "batch_portion": portion,
                     "training_time": train_time,
@@ -38,14 +39,25 @@ if __name__ == "__main__":
                 })
 
     COMM.Barrier()
+    # GPT: Update the table if it already exists
     if RANK == 0 and rows:
-        df = pd.DataFrame(rows, columns=[
-            "act_func", "batch_portion", "training_time",
-            "train_rmse", "val_rmse", "test_rmse"
-        ])
-        os.makedirs(f"tables", exist_ok=True)
+        os.makedirs("table", exist_ok=True)
+        out_path = "table/summary_metrics.csv"
 
-        out_path = f"tables/summary_{process_number}process.csv"
+        # Create DataFrame from new rows
+        new_df = pd.DataFrame(rows, columns=[
+            "process_num", "act_func", "batch_portion", 
+            "training_time", "train_rmse", "val_rmse", "test_rmse"
+        ])
+
+        # If file exists, read existing CSV and append
+        if os.path.exists(out_path):
+            old_df = pd.read_csv(out_path)
+            df = pd.concat([old_df, new_df], ignore_index=True)
+        else:
+            df = new_df
+
+        # Save updated DataFrame
         df.to_csv(out_path, index=False)
              
             
