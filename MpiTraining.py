@@ -525,8 +525,13 @@ def experiment(act_name, batch_portion, proc_num):
     COMM.Barrier()
     df.to_csv(csv_path, index=False)
 
-
+    COMM.Barrier()
+    t0_test = MPI.Wtime()
     test_rmse = trainer.compute_RMSE(X_test, y_test)
+    COMM.Barrier()
+    t1_test = MPI.Wtime()
+    local_time = t1_test - t0_test
+    test_time = COMM.reduce(local_time, op=MPI.MAX, root=0)
 
     if RANK == 0:
         print("\n========== Results ==========")
@@ -559,9 +564,9 @@ def experiment(act_name, batch_portion, proc_num):
     COMM.Barrier()
     
     if RANK == 0:
-        return train_time, train_rmse, validation_rmse, test_rmse, batch_size
+        return train_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size
     else:
-        return None, None, None, None, None
+        return None, None, None, None, None, None
 
 
 if __name__ == "__main__":
