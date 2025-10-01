@@ -16,8 +16,9 @@ conda create -n mpipy_mpich -c conda-forge python=3.11 mpich mpi4py numpy pandas
 conda activate mpipy_mpich
 ```
 
-### Experiments with different number of processes 
-**Run experiments on 1, 2, 3 processes**
+***IMPORTANT:*** YOU NEED TO DOWNLOAD THE FILE `nytaxi2022.csv` ON YOUR OWN.
+
+### Run experiments on 1, 2, 3 processes
 ```
 mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-9, 5e-9, 1e-8, 5e-8, 1e-7]" 1
 mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-9, 5e-9, 1e-8, 5e-8, 1e-7]" 2
@@ -25,9 +26,9 @@ mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-9, 5e-9,
 ```
 
 ## Note:
-Use MPICH
-Use Python 3.11
-Training and evaluation are carried out on a laptop equipped with an Apple M4 Pro processor and 24 GB of memory.
-GPT interactions for MPI development are all labeled, search for 'GPT' to see the part where we get helps.
+- Use MPICH
+- Use Python 3.11
+- Training and evaluation are carried out on a laptop equipped with an Apple M4 Pro processor and 24 GB of memory.
+- GPT interactions for MPI development are all labeled, search for 'GPT' to see the part where we get helps.
  
 
