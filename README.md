@@ -14,11 +14,7 @@ Clone this repo, install the packages and run the following command on the local
 `conda activate mpipy_mpich`
 
 ### Experiments with different number of processes 
-- **1 processes experiments:** `mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-7, 5e-7, 1e-6, 5e-6, 1e-5]" 1`
-- **2 processes experiments:** `mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-7, 5e-7, 1e-6, 5e-6, 1e-5]" 2`
-- **3 processes experiments:** `mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-7, 5e-7, 1e-6, 5e-6, 1e-5]" 3`
-
-**Run them together**
+**Run experiments on 1, 2, 3 processes**
 ```
 mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-7, 5e-7, 1e-6, 5e-6, 1e-5]" 1
 mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-7, 5e-7, 1e-6, 5e-6, 1e-5]" 2
