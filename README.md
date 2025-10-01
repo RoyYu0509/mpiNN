@@ -10,8 +10,11 @@
 Clone this repo, install the packages and run the following command on the local computer:
 
 ### Set up environment
-`conda create -n mpipy_mpich -c conda-forge python=3.11 mpich mpi4py numpy pandas scikit-learn matplotlib`
-`conda activate mpipy_mpich`
+```
+conda create -n mpipy_mpich -c conda-forge python=3.11 mpich mpi4py numpy pandas scikit-learn matplotlib
+ 
+conda activate mpipy_mpich
+```
 
 ### Experiments with different number of processes 
 **Run experiments on 1, 2, 3 processes**
