@@ -136,6 +136,37 @@ def remove_outliers_zscore(df, columns, threshold=3):
     return df_clean
 
 
+def remove_outliers_quantile(df, columns, total_drop_frac=0.05, combine_logic="all"):
+    """
+    Keep only the central (1 - total_drop_frac) mass for each column.
+    E.g., total_drop_frac=0.01 -> drop ~0.5% low + 0.5% high per column.
+    combine_logic:
+      - "all": keep row only if it's inside bounds for ALL columns (strict; recommended)
+      - "any": keep row if it's inside bounds for AT LEAST one column (looser)
+    """
+    if total_drop_frac <= 0:
+        return df
+
+    tail = total_drop_frac / 2.0
+    inside_masks = []
+    for col in columns:
+        if col not in df.columns:
+            continue
+        lo = df[col].quantile(tail)
+        hi = df[col].quantile(1 - tail)
+        inside_masks.append((df[col] >= lo) & (df[col] <= hi))
+
+    if not inside_masks:
+        return df
+
+    if combine_logic == "any":
+        keep_mask = np.logical_or.reduce(inside_masks)
+    else:  # "all"
+        keep_mask = np.logical_and.reduce(inside_masks)
+
+    return df[keep_mask]
+
+
 def clean_data_chunk(chunk, outlier_config=None):
     """
     Clean a data chunk by removing NaN values, invalid entries, and outliers
@@ -256,6 +287,12 @@ def remove_outliers_from_dataframe(df, outlier_config):
         threshold = outlier_config.get("zscore_threshold", 3)
         df_clean = remove_outliers_iqr(df_clean, numerical_cols, multiplier=multiplier)
         df_clean = remove_outliers_zscore(df_clean, numerical_cols, threshold=threshold)
+    elif method == "quantile":
+        qfrac = outlier_config.get("quantile_drop_frac", 0.01)   # ~1% total removed
+        logic = outlier_config.get("combine_logic", "all")
+        df_clean = remove_outliers_quantile(df_clean, numerical_cols,
+                                            total_drop_frac=qfrac,
+                                            combine_logic=logic)
     elif method == "none":
         # No statistical outlier removal, return as is
         pass
@@ -354,11 +391,14 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     
     # Create outlier configuration
     outlier_config = {
-        "method": outlier_removal_method,
+        "method": outlier_removal_method,   # set to "quantile"
         "iqr_multiplier": iqr_multiplier,
         "zscore_threshold": zscore_threshold,
-        "apply_domain_outliers": apply_domain_outliers
+        "apply_domain_outliers": apply_domain_outliers,
+        "quantile_drop_frac": 0.01,   # drop ~1% total
+        "combine_logic": "all",       # or "any"
     }
+
     
     # Step 3: Preprocess training set (fit scaler)
     print(f"[Rank {RANK}] Step 3: Preprocessing training set...")
@@ -412,8 +452,8 @@ def experiment(act_name, batch_portion, proc_num):
             raw_path="nytaxi2022.csv",
             out_train="nytaxi_train.csv",
             out_test="nytaxi_test.csv",
-            outlier_removal_method="iqr",
-            iqr_multiplier=2.0,
+            outlier_removal_method="quantile",   # <── change this
+            iqr_multiplier=2.0,                  # ignored now
             apply_domain_outliers=True
         )
     else:
@@ -452,8 +492,8 @@ def experiment(act_name, batch_portion, proc_num):
         file_path=train_path,
         readin_chunksize=5000,
         valid_portion=0.15,
-        lr=4e-3,
-        epochs=300,
+        lr=2e-3,
+        epochs=500,
         batch_portion=batch_portion,
         patience=20,
         lr_decay=0.9,
