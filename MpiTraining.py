@@ -47,7 +47,7 @@ def load_and_clean_data(file_path, chunk_size=100000, outlier_config=None):
     total_cleaned_rows = 0
     
     for i, chunk in enumerate(pd.read_csv(file_path, chunksize=chunk_size, low_memory=False)):
-        if RANK == 0:
+        if (RANK == 0) & (i % 100 == 0):
             print(f"[Rank {RANK}] Processing chunk {i+1}...")
         
         original_rows = len(chunk)
@@ -61,10 +61,10 @@ def load_and_clean_data(file_path, chunk_size=100000, outlier_config=None):
         
         chunks.append(chunk)
         
-        if RANK == 0:
-            removed_rows = original_rows - cleaned_rows
-            removal_percentage = (removed_rows / original_rows) * 100 if original_rows > 0 else 0
-            print(f"[Rank {RANK}] Chunk {i+1}: Removed {removed_rows} rows ({removal_percentage:.2f}%)")
+        # if RANK == 0:
+        #     removed_rows = original_rows - cleaned_rows
+        #     removal_percentage = (removed_rows / original_rows) * 100 if original_rows > 0 else 0
+        #     print(f"[Rank {RANK}] Chunk {i+1}: Removed {removed_rows} rows ({removal_percentage:.2f}%)")
     
     df = pd.concat(chunks, ignore_index=True)
     
@@ -104,9 +104,8 @@ def remove_outliers_iqr(df, columns, multiplier=1.5):
             df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
             removed_count = initial_count - len(df_clean)
             
-            if removed_count > 0:
-                print(f"[Rank {RANK}] Removed {removed_count} outliers from column '{col}' using IQR method")
-    
+            # if removed_count > 0:
+            #     print(f"[Rank {RANK}] Removed {removed_count} outliers from column '{col}' using IQR method")
     return df_clean
 
 def remove_outliers_zscore(df, columns, threshold=3):
@@ -179,6 +178,19 @@ def clean_data_chunk(chunk, outlier_config=None):
     
     return chunk_clean
 
+def normalize_features(df):
+    print(f"[Rank {RANK}] Normalizing features...")
+    
+    numerical_cols = [
+        "passenger_count", "trip_distance", "RatecodeID",
+        "PULocationID", "DOLocationID", "payment_type", "extra"
+    ]
+    
+    scaler = StandardScaler()
+    df[numerical_cols] = scaler.fit_transform(df[numerical_cols])
+    
+    return df, scaler
+
 def load_and_clean_data_basic(file_path, chunk_size=100000):
     """
     Load data with basic cleaning only (no outlier removal)
@@ -201,7 +213,7 @@ def load_and_clean_data_basic(file_path, chunk_size=100000):
     
     chunks = []
     for i, chunk in enumerate(pd.read_csv(file_path, chunksize=chunk_size, low_memory=False)):
-        if RANK == 0:
+        if (RANK == 0) & (i % 100 == 0):
             print(f"[Rank {RANK}] Processing chunk {i+1}...")
         
         chunk = chunk[selected_columns]
@@ -250,58 +262,42 @@ def remove_outliers_from_dataframe(df, outlier_config):
     
     return df_clean
 
-def normalize_features_train_only(train_df, feature_cols):
+def preprocess_dataframe(df, scaler, outlier_config, feature_cols, fit_scaler=False):
     """
-    Normalize features using only training set statistics
+    Apply preprocessing to a DataFrame including outlier removal and normalization
     
     Args:
-        train_df: Training DataFrame
-        feature_cols: List of feature column names to normalize
+        df: DataFrame to preprocess
+        scaler: StandardScaler object (fitted if fit_scaler=False)
+        outlier_config: Dictionary with outlier removal configuration
+        feature_cols: List of feature column names
+        fit_scaler: Whether to fit the scaler on this data (True for train, False for test)
     
     Returns:
-        Tuple of (normalized_train_df, fitted_scaler)
+        Tuple of (preprocessed_df, scaler)
     """
-    print(f"[Rank {RANK}] Fitting scaler on training data...")
+    print(f"[Rank {RANK}] Preprocessing dataframe with shape: {df.shape}")
     
-    train_df_norm = train_df.copy()
-    scaler = StandardScaler()
+    # Step 1: Remove outliers
+    df_clean = remove_outliers_from_dataframe(df, outlier_config)
+    outliers_removed = len(df) - len(df_clean)
+    print(f"[Rank {RANK}] Removed {outliers_removed} outliers ({(outliers_removed/len(df)*100):.2f}%)")
     
-    # Fit and transform training data
-    train_df_norm[feature_cols] = scaler.fit_transform(train_df[feature_cols])
+    # Step 2: Normalize features
+    df_preprocessed = df_clean.copy()
     
-    return train_df_norm, scaler
-
-def apply_normalization(df, scaler, feature_cols):
-    """
-    Apply existing scaler to normalize data
+    if fit_scaler:
+        # Fit scaler on training data
+        print(f"[Rank {RANK}] Fitting scaler on training data...")
+        scaler = StandardScaler()
+        df_preprocessed[feature_cols] = scaler.fit_transform(df_clean[feature_cols])
+    else:
+        # Use existing fitted scaler for test data
+        print(f"[Rank {RANK}] Applying fitted scaler to data...")
+        df_preprocessed[feature_cols] = scaler.transform(df_clean[feature_cols])
     
-    Args:
-        df: DataFrame to normalize
-        scaler: Fitted StandardScaler object
-        feature_cols: List of feature column names to normalize
-    
-    Returns:
-        DataFrame with normalized features
-    """
-    df_norm = df.copy()
-    df_norm[feature_cols] = scaler.transform(df[feature_cols])
-    return df_norm
-
-def normalize_features(df):
-    """
-    Legacy function - kept for backward compatibility
-    """
-    print(f"[Rank {RANK}] Normalizing features...")
-    
-    numerical_cols = [
-        "passenger_count", "trip_distance", "RatecodeID",
-        "PULocationID", "DOLocationID", "payment_type", "extra"
-    ]
-    
-    scaler = StandardScaler()
-    df[numerical_cols] = scaler.fit_transform(df[numerical_cols])
-    
-    return df, scaler
+    print(f"[Rank {RANK}] Final preprocessed shape: {df_preprocessed.shape}")
+    return df_preprocessed, scaler
 
 def preprocess_pipeline(raw_path="nytaxi2022.csv", 
                         out_train="nytaxi_train.csv", 
@@ -310,12 +306,17 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
                         random_state=42,
                         outlier_removal_method="iqr",
                         iqr_multiplier=1.5,
-                        zscore_threshold=3):
+                        zscore_threshold=3,
+                        apply_domain_outliers=True):
     """
-    Complete preprocessing pipeline with proper train/test split and outlier removal
+    Complete preprocessing pipeline: Split first, then preprocess both train and test sets
     
-    IMPORTANT: This pipeline first splits the data, then removes outliers only from 
-    the training set to prevent data leakage and maintain realistic test conditions.
+    Pipeline Steps:
+    1. Load raw data with basic cleaning only
+    2. Split into train/test sets
+    3. Remove outliers from both train and test sets
+    4. Normalize features (fit scaler on train, apply to both)
+    5. Save processed datasets
     
     Args:
         raw_path: Path to raw CSV file
@@ -326,64 +327,79 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
         outlier_removal_method: Method for outlier removal ("iqr", "zscore", "both", "none")
         iqr_multiplier: Multiplier for IQR method (default: 1.5)
         zscore_threshold: Threshold for Z-score method (default: 3)
+        apply_domain_outliers: Whether to apply domain-specific outlier removal
     
     Returns:
         Tuple of (train_path, test_path, feature_cols)
     """
+    print(f"[Rank {RANK}] Starting preprocessing pipeline...")
+    
     # Step 1: Load raw data with basic cleaning only (no outlier removal yet)
-    print(f"[Rank {RANK}] Step 1: Loading and basic cleaning of raw data...")
-    df = load_and_clean_data_basic(raw_path)
+    print(f"[Rank {RANK}] Step 1: Loading raw data with basic cleaning...")
+    df_raw = load_and_clean_data_basic(raw_path)
     
     feature_cols = [
-        "passenger_count", "trip_distance", "RatecodeID",
+        "passenger_count", "trip_distance", "RatecodeID", 
         "PULocationID", "DOLocationID", "payment_type", "extra"
     ]
     
-    df_out = df[feature_cols + ["total_amount"]]
+    df_features = df_raw[feature_cols + ["total_amount"]]
     
-    # Step 2: Split into train/test BEFORE outlier removal
-    print(f"[Rank {RANK}] Step 2: Splitting into train/test sets...")
-    train_df, test_df = train_test_split(df_out, test_size=test_size, random_state=random_state)
+    # Step 2: Split into train/test BEFORE preprocessing
+    print(f"[Rank {RANK}] Step 2: Splitting data into train/test sets...")
+    train_df_raw, test_df_raw = train_test_split(df_features, test_size=test_size, random_state=random_state)
     
-    print(f"[Rank {RANK}] Training set shape: {train_df.shape}")
-    print(f"[Rank {RANK}] Test set shape: {test_df.shape}")
+    print(f"[Rank {RANK}] Raw training set shape: {train_df_raw.shape}")
+    print(f"[Rank {RANK}] Raw test set shape: {test_df_raw.shape}")
     
-    # Step 3: Remove outliers ONLY from training set
-    print(f"[Rank {RANK}] Step 3: Removing outliers from training set only...")
-    
+    # Create outlier configuration
     outlier_config = {
         "method": outlier_removal_method,
         "iqr_multiplier": iqr_multiplier,
-        "zscore_threshold": zscore_threshold
+        "zscore_threshold": zscore_threshold,
+        "apply_domain_outliers": apply_domain_outliers
     }
     
-    train_df_clean = remove_outliers_from_dataframe(train_df, outlier_config)
+    # Step 3: Preprocess training set (fit scaler)
+    print(f"[Rank {RANK}] Step 3: Preprocessing training set...")
+    train_df_processed, scaler = preprocess_dataframe(
+        train_df_raw, None, outlier_config, feature_cols, fit_scaler=True
+    )
     
-    print(f"[Rank {RANK}] Training set after outlier removal: {train_df_clean.shape}")
-    outliers_removed = len(train_df) - len(train_df_clean)
-    removal_percentage = (outliers_removed / len(train_df)) * 100
-    print(f"[Rank {RANK}] Removed {outliers_removed} outliers ({removal_percentage:.2f}%) from training set")
-    print(f"[Rank {RANK}] Test set kept unchanged: {test_df.shape}")
+    # Step 4: Preprocess test set (use fitted scaler)
+    print(f"[Rank {RANK}] Step 4: Preprocessing test set...")
+    test_df_processed, _ = preprocess_dataframe(
+        test_df_raw, scaler, outlier_config, feature_cols, fit_scaler=False
+    )
     
-    # Step 4: Normalize features using training set statistics only
-    print(f"[Rank {RANK}] Step 4: Normalizing features using training set statistics...")
-    train_df_final, scaler = normalize_features_train_only(train_df_clean, feature_cols)
-    
-    # Apply same normalization to test set
-    test_df_final = apply_normalization(test_df, scaler, feature_cols)
-    
-    # Step 5: Save processed data
-    train_df_final.to_csv(out_train, index=False)
-    test_df_final.to_csv(out_test, index=False)
+    # Step 5: Save processed datasets
+    print(f"[Rank {RANK}] Step 5: Saving processed datasets...")
+    train_df_processed.to_csv(out_train, index=False)
+    test_df_processed.to_csv(out_test, index=False)
     
     # Save preprocessing objects for inference
     with open("preprocessing_objects.pkl", "wb") as f:
         pickle.dump({"scaler": scaler, "outlier_config": outlier_config}, f)
     
-    print(f"[Rank {RANK}] Final training data saved to: {out_train}")
-    print(f"[Rank {RANK}] Final test data saved to: {out_test}")
+    print(f"[Rank {RANK}] Training data saved to: {out_train}")
+    print(f"[Rank {RANK}] Test data saved to: {out_test}")
+    
+    # Print final summary
+    if RANK == 0:
+        print(f"\n[Rank {RANK}] === PREPROCESSING SUMMARY ===")
+        print(f"Original dataset: {df_raw.shape}")
+        print(f"Raw train: {train_df_raw.shape} -> Processed train: {train_df_processed.shape}")
+        print(f"Raw test: {test_df_raw.shape} -> Processed test: {test_df_processed.shape}")
+        
+        train_reduction = (len(train_df_raw) - len(train_df_processed)) / len(train_df_raw) * 100
+        test_reduction = (len(test_df_raw) - len(test_df_processed)) / len(test_df_raw) * 100
+        
+        print(f"Train outliers removed: {train_reduction:.2f}%")
+        print(f"Test outliers removed: {test_reduction:.2f}%")
+        print(f"==============================\n")
     
     return out_train, out_test, feature_cols
+# ------------------------------------------------------------- #
 
 def experiment(act_name, batch_portion, proc_num):
     act_name = act_name
@@ -397,7 +413,8 @@ def experiment(act_name, batch_portion, proc_num):
             out_train="nytaxi_train.csv",
             out_test="nytaxi_test.csv",
             outlier_removal_method="iqr",
-            iqr_multiplier=1.5
+            iqr_multiplier=2.0,
+            apply_domain_outliers=True
         )
     else:
         train_path, test_path, feature_cols = None, None, None
