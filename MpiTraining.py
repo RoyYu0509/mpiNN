@@ -22,6 +22,7 @@ RANK = COMM.Get_rank()
 SIZE = COMM.Get_size()
 
 # ---------------- New Preprocessing Functions ---------------- #
+# GPT: Remove the outliers in terms of percentage
 def load_and_clean_data(file_path, chunk_size=100000, outlier_config=None):
     """
     Load and clean data from CSV file in chunks
@@ -492,11 +493,11 @@ def experiment(act_name, batch_portion, proc_num):
         file_path=train_path,
         readin_chunksize=5000,
         valid_portion=0.15,
-        lr=2e-3,
-        epochs=500,
+        lr=1e-3,
+        epochs=800,
         batch_portion=batch_portion,
         patience=20,
-        lr_decay=0.9,
+        lr_decay=0.95,
         report_per=1,
         lr_resch_stepsize=50,
         save_fig=save_fig
