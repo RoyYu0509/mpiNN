@@ -396,8 +396,8 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
         "iqr_multiplier": iqr_multiplier,
         "zscore_threshold": zscore_threshold,
         "apply_domain_outliers": apply_domain_outliers,
-        "quantile_drop_frac": 0.01,   # drop ~1% total
-        "combine_logic": "all",       # or "any"
+        "quantile_drop_frac": 0.04,   
+        "combine_logic": "all",       
     }
 
     
@@ -489,7 +489,7 @@ def experiment(act_name, batch_portion, proc_num):
     COMM.Barrier()
     t0 = MPI.Wtime()
 
-    train_losses, val_losses = trainer.mpiSGD(
+    train_losses, val_losses, batch_size = trainer.mpiSGD(
         file_path=train_path,
         readin_chunksize=5000,
         valid_portion=0.15,
@@ -559,9 +559,9 @@ def experiment(act_name, batch_portion, proc_num):
     COMM.Barrier()
     
     if RANK == 0:
-        return train_time, train_rmse, validation_rmse, test_rmse
+        return train_time, train_rmse, validation_rmse, test_rmse, batch_size
     else:
-        return None, None, None, None
+        return None, None, None, None, None
 
 
 if __name__ == "__main__":

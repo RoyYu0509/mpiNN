@@ -95,7 +95,7 @@ class mpiMLP:
 
         # Training loop
         print()
-        print(f"Training Starts on Rank {self.RANK}......")
+        print(f"Training Starts on Rank {self.RANK} with batch size {batch_size}......")
         print()
         for epoch in range(epochs):
             # Sample a local minibatch
@@ -103,8 +103,8 @@ class mpiMLP:
                 idx = np.arange(n_local)
             else:
                 idx = rng.choice(n_local, size=batch_size, replace=False)
-            X_bat, y_bat = X[idx], y[idx]
 
+            X_bat, y_bat = X[idx], y[idx]
             # Local gradients
             grad_dict = self.model.compute_batch_grads(X_bat, y_bat)
             local_training_loss = float(grad_dict["loss"])  # FIX: scalarize for clean compare/print
@@ -214,7 +214,7 @@ class mpiMLP:
                 plt.close()
                 print(f"Training history plot saved as '{save_fig}'")
         
-        return training_loss_his, validation_loss_his
+        return training_loss_his, validation_loss_his, batch_size
 
     def mpi_compute_MSE(self, X, y):
         y_est = self.model.forward(X)

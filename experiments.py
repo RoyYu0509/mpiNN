@@ -25,7 +25,7 @@ if __name__ == "__main__":
     for portion in bat_por_list:
         for act_func in act_func_list:
             # Run experiment
-            train_time, train_rmse, validation_rmse, test_rmse = experiment(act_name=act_func, batch_portion=portion, proc_num=process_number)
+            train_time, train_rmse, validation_rmse, test_rmse, batch_size = experiment(act_name=act_func, batch_portion=portion, proc_num=process_number)
             # Store metrics
             if RANK == 0:  # only root collects to avoid duplicates
                 rows.append({
@@ -36,6 +36,7 @@ if __name__ == "__main__":
                     "train_rmse": train_rmse,
                     "val_rmse": validation_rmse,
                     "test_rmse": test_rmse,
+                    "batch_size": batch_size
                 })
 
     COMM.Barrier()
@@ -47,7 +48,7 @@ if __name__ == "__main__":
         # Create DataFrame from new rows
         new_df = pd.DataFrame(rows, columns=[
             "process_num", "act_func", "batch_portion", 
-            "training_time", "train_rmse", "val_rmse", "test_rmse"
+            "training_time", "train_rmse", "val_rmse", "test_rmse", "batch_size"
         ])
 
         # If file exists, read existing CSV and append
