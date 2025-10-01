@@ -4,7 +4,9 @@
 - Computing gradients and losses in parallel.
 - Log the experiment results
 ## IMPORTANT: 
-**YOU NEED TO PREPARE THE FILE `nytaxi2022.csv` ON YOUR OWN. Move it to the project folder so that the scripts can read it.**
+**YOU NEED TO PREPARE THE FILE `nytaxi2022.csv` ON YOUR OWN.**
+
+**Move it to the project folder so that the scripts can read it.**
 
 # Try it out!
 Clone this repo, install the packages, and run the following command on the local computer:
