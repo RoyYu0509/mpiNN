@@ -507,12 +507,12 @@ def experiment(act_name, bat_size, proc_num):
         readin_chunksize=5000,
         valid_portion=0.15,
         lr=1e-3,
-        epochs=2000,
+        epochs=1500,
         batch_size=int(bat_size),
         patience=5,
         lr_decay=0.95,
         report_per=20,
-        lr_resch_stepsize=50,
+        lr_resch_stepsize=200,
         save_fig=save_fig
     )
     print()
