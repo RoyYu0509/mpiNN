@@ -177,7 +177,7 @@ class mpiMLP:
             validation_loss_his.append(val_loss)
 
             # Report the loss per `report_per`
-            if (epoch % report_per == report_per) and (self.RANK==0):
+            if (epoch % report_per == 0) and (self.RANK==0):
                 print()
                 print(f"Aggregating Losses to Rank {self.RANK}...")
                 print()
