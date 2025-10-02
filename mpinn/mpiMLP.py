@@ -149,7 +149,8 @@ class mpiMLP:
             t1 = MPI.Wtime()
             local_time = t1 - t0
             train_time_iter = self.COMM.reduce(local_time, op=MPI.MAX, root=0)
-            time_list.append(train_time_iter)
+            if self.RANK == 0:
+                time_list.append(train_time_iter)
 
             # LR decay each epoch (as you specified)
             if (lr_decay is not None) and (epoch % lr_resch_stepsize == 0):
@@ -218,8 +219,12 @@ class mpiMLP:
                 plt.close()
                 print(f"Training history plot saved as '{save_fig}'")
 
+        print(time_list)
         # Compute the average time for each training iteration
-        SGD_per_iter_time = sum(time_list)/len(time_list)
+        time_list = self.COMM.bcast(time_list, root=0)
+        print(f"Rank {self.RANK} recieved time_list: {time_list}")
+        if self.RANK == 0:
+            SGD_per_iter_time = sum(time_list)/len(time_list)
 
         return training_loss_his, validation_loss_his, batch_size, SGD_per_iter_time
 
