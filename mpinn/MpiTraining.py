@@ -345,7 +345,10 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
                         outlier_removal_method="iqr",
                         iqr_multiplier=1.5,
                         zscore_threshold=3,
-                        apply_domain_outliers=True):
+                        apply_domain_outliers=True,
+                        feature_cols = [
+                        "passenger_count", "trip_distance", "RatecodeID", 
+                        "PULocationID", "DOLocationID", "payment_type", "extra"]):
     """
     Complete preprocessing pipeline: Split first, then preprocess both train and test sets
     
@@ -370,17 +373,17 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     Returns:
         Tuple of (train_path, test_path, feature_cols)
     """
+    # Termination if exists
+    if os.path.exists(out_train) and os.path.exists(out_test):
+        print("Training and Testing data exist")
+        return out_train, out_test, feature_cols
+    
     print(f"[Rank {RANK}] Starting preprocessing pipeline...")
     print()
     # Step 1: Load raw data with basic cleaning only (no outlier removal yet)
     print(f"[Rank {RANK}] Step 1: Loading raw data with basic cleaning...")
     print()
     df_raw = load_and_clean_data_basic(raw_path)
-    
-    feature_cols = [
-        "passenger_count", "trip_distance", "RatecodeID", 
-        "PULocationID", "DOLocationID", "payment_type", "extra"
-    ]
     
     df_features = df_raw[feature_cols + ["total_amount"]]
     
@@ -424,8 +427,17 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     print()
     print(f"[Rank {RANK}] Step 5: Saving processed datasets...")
     print()
-    train_df_processed.to_csv(out_train, index=False)
-    test_df_processed.to_csv(out_test, index=False)
+    if not os.path.exists(out_train):
+        train_df_processed.to_csv(out_train, index=False)
+    else:
+        print("Training data exist")
+
+    if not os.path.exists(out_test):
+        test_df_processed.to_csv(out_test, index=False)
+    else:
+        print("Testing data exist")
+    
+    print()
     
     # Save preprocessing objects for inference
     with open("preprocessing_objects.pkl", "wb") as f:
@@ -453,7 +465,7 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     return out_train, out_test, feature_cols
 # ------------------------------------------------------------- #
 
-def experiment(act_name, bat_size, proc_num):
+def experiment(act_name, bat_size, proc_num, readin_chunk_size=500000):
     act_name = act_name
     bat_size = bat_size
     proc_num = proc_num
@@ -504,7 +516,7 @@ def experiment(act_name, bat_size, proc_num):
     # SGD Process
     train_losses, val_losses, batch_size, sgd_iter_time, total_iterations = trainer.mpiSGD(
         train_file_path=train_path,
-        readin_chunksize=5000,
+        readin_chunksize=readin_chunk_size,
         valid_portion=0.15,
         lr=1e-3,
         epochs=1500,
@@ -538,7 +550,7 @@ def experiment(act_name, bat_size, proc_num):
 
 
     # Load in testing dataset on RANK 0 and distribute
-    testDistributor = MPIDD(test_path, readin_chunksize=5000)
+    testDistributor = MPIDD(test_path, readin_chunksize=readin_chunk_size)
     testDistributor.mpi_load_in_and_distribute(target_col="total_amount", shuffle=True)
     X_test, y_test = testDistributor.get_X_y(target_name="total_amount")
 

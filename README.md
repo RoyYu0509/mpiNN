@@ -18,22 +18,25 @@ conda create -n mpipy_mpich -c conda-forge python=3.11 mpich mpi4py numpy pandas
 conda activate mpipy_mpich
 ```
 
+# Run Experiment
+Use the following command to run experiment with the interested hyperparameters.
+```
+mpiexec -np 1 python -u -m experiments "{LIST OF ACT FUNC NAME}" "{LIST OF BATCH SIZE}" {NUMBER OF PROCESSES} {READ IN DATA CHUNK SIZE}
+```
+
 ## Run sub-experiments with one activation function
 ```
-mpiexec -np 1 python -u -m experiments "['relu']" "[240]" 1
-mpiexec -np 2 python -u -m experiments "['relu']" "[240]" 2
-mpiexec -np 3 python -u -m experiments "['relu']" "[240]" 3
-mpiexec -np 4 python -u -m experiments "['relu']" "[240]" 4
-mpiexec -np 5 python -u -m experiments "['relu']" "[240]" 5
+mpiexec -np 2 python -u -m experiments "['relu']" "[660, 1320]" 2 400000
+mpiexec -np 3 python -u -m experiments "['relu']" "[660, 1320]" 3 400000
 ```
 
 
 ## Run the full experiments on 1, 2, 3, 4processes
 ```
-mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[180, 240, 300, 360, 420]" 1
-mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[180, 240, 300, 360, 420]" 2
-mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[180, 240, 300, 360, 420]" 3
-mpiexec -np 4 python -u -m experiments "['relu','sigmoid','tanh']" "[180, 240, 300, 360, 420]" 4
+mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[660, 1320, 1920, 2580]" 1 400000
+mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[660, 1320, 1920, 2580]" 2 400000
+mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[660, 1320, 1920, 2580]" 3 400000
+mpiexec -np 4 python -u -m experiments "['relu','sigmoid','tanh']" "[660, 1320, 1920, 2580]" 4 400000
 ```
 
 # Note:

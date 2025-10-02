@@ -92,6 +92,10 @@ class mpiMLP:
         total_iteration = epochs
 
         for epoch in range(epochs):
+            # Time the start of SGD iteration
+            self.COMM.Barrier()
+            t0 = MPI.Wtime()
+
             # Sample a local minibatch
             if batch_size_proc >= n_local:
                 idx = np.arange(n_local)
@@ -99,10 +103,6 @@ class mpiMLP:
                 idx = rng.choice(n_local, size=batch_size_proc, replace=False)
 
             X_bat, y_bat = X[idx], y[idx]
-
-            # Time the start of SGD iteration
-            self.COMM.Barrier()
-            t0 = MPI.Wtime()
 
             # Local gradients
             grad_dict = self.model.compute_batch_grads(X_bat, y_bat)
@@ -146,14 +146,6 @@ class mpiMLP:
             self.model.W2 -= lr * dW2
             self.model.b2 -= lr * db2
 
-            # Time the end of SGD iteration 
-            self.COMM.Barrier()
-            t1 = MPI.Wtime()
-            local_time = t1 - t0
-            train_time_iter = self.COMM.reduce(local_time, op=MPI.MAX, root=0)
-            if self.RANK == 0:
-                time_list.append(train_time_iter)
-
             # LR decay each epoch (as you specified)
             if (lr_decay is not None) and (epoch % lr_resch_stepsize == 0):
                 lr *= lr_decay
@@ -170,6 +162,15 @@ class mpiMLP:
                 # Fill the buff in root proc
                 losses[0] = train_loss
                 losses[1] = val_loss
+            
+            # Time the end of SGD iteration 
+            self.COMM.Barrier()
+            t1 = MPI.Wtime()
+            local_time = t1 - t0
+            sum_time = self.COMM.reduce(local_time, op=MPI.SUM, root=0)
+            if self.RANK == 0:
+                train_time_iter = sum_time / self.SIZE
+                time_list.append(train_time_iter)
 
             req = self.COMM.Ibcast(losses, root=0)
             req.Wait()

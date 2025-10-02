@@ -14,20 +14,22 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument("act_func_list", type=str)
         parser.add_argument("batch_portion_list", type=str)
-        parser.add_argument("p_num", type=str)
+        parser.add_argument("p_num", type=int)
+        parser.add_argument("readin_chunk_size", type=int)
         return parser.parse_args()
     
     args = parse_args()
     bat_size_list = ast.literal_eval(args.batch_portion_list)
     act_func_list = ast.literal_eval(args.act_func_list)
     process_number = args.p_num
+    readin_chunk_size = args.readin_chunk_size
     rows = []
 
     for batch_size in bat_size_list:
         for act_func in act_func_list:
             batch_size = int(batch_size)
             # Run experiment
-            sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, bat_siz, total_iter = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
+            sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, bat_siz, total_iter = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number, readin_chunk_size=readin_chunk_size)
             # Store metrics
             if RANK == 0:  # only root collects to avoid duplicates
                 rows.append({
