@@ -24,8 +24,8 @@ if __name__ == "__main__":
     rows = []
 
     for batch_size in bat_size_list:
-        batch_size = int(batch_size)
         for act_func in act_func_list:
+            batch_size = int(batch_size)
             # Run experiment
             sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
             # Store metrics
