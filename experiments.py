@@ -27,20 +27,19 @@ if __name__ == "__main__":
         batch_size = int(batch_size)
         for act_func in act_func_list:
             # Run experiment
-            train_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
+            sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
             # Store metrics
             if RANK == 0:  # only root collects to avoid duplicates
                 rows.append({
                     "process_num": process_number,
                     "act_func": act_func,
-                    "SGD_per_iter_time": train_time,
+                    "SGD_100_iter_time": sgd_iter_time*100,
                     "testing_time": test_time,
                     "train_rmse": train_rmse,
                     "val_rmse": validation_rmse,
                     "test_rmse": test_rmse,
                     "batch_size": batch_size
                 })
-
     COMM.Barrier()
     # GPT: Update the table if it already exists
     if RANK == 0 and rows:
@@ -50,7 +49,7 @@ if __name__ == "__main__":
         # Create DataFrame from new rows
         new_df = pd.DataFrame(rows, columns=[
             "process_num", "act_func",
-            "SGD_per_iter_time", "testing_time", "train_rmse", 
+            "SGD_100_iter_time", "testing_time", "train_rmse", 
             "val_rmse", "test_rmse", "batch_size"
         ])
 
