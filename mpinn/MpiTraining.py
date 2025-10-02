@@ -509,7 +509,7 @@ def experiment(act_name, bat_size, proc_num):
         lr=1e-3,
         epochs=2000,
         batch_size=int(bat_size),
-        patience=10,
+        patience=5,
         lr_decay=0.95,
         report_per=20,
         lr_resch_stepsize=50,
