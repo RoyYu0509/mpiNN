@@ -219,12 +219,9 @@ class mpiMLP:
                 plt.close()
                 print(f"Training history plot saved as '{save_fig}'")
 
-        print(time_list)
-        # Compute the average time for each training iteration
+        # Boardcast the time list and calcuate the per iteration time
         time_list = self.COMM.bcast(time_list, root=0)
-        print(f"Rank {self.RANK} recieved time_list: {time_list}")
-        if self.RANK == 0:
-            SGD_per_iter_time = sum(time_list)/len(time_list)
+        SGD_per_iter_time = sum(time_list)/len(time_list)
 
         return training_loss_his, validation_loss_his, batch_size, SGD_per_iter_time
 
