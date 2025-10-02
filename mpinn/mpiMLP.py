@@ -17,15 +17,17 @@ class mpiMLP:
 
     def mpiSGD(self,
                # Data args
-               file_path, readin_chunksize,
+               train_file_path,
+               readin_chunksize,
                # Model training args
                valid_portion = 0.1,
                lr: float = 1e-3,
                epochs: int = 1000,
-               batch_portion: float = 0.1,   # FIX: annotate as float; supports int too
+               # batch_portion: float = 0.1,   # FIX: annotate as float; supports int too
+               batch_size=10,
                patience: int = 10,
                lr_decay: float = 0.5,
-               report_per: int = 5000,
+               report_per: int = 20,
                lr_resch_stepsize: int = 5000,
                grad_clip: int = 1e2,
                save_fig: str = None
@@ -34,12 +36,10 @@ class mpiMLP:
         best_data_loss = np.inf
         training_loss_his = []
         validation_loss_his = []
-
-        # Distribute dataset
-
-        Distributor = MPIDD(file_path, readin_chunksize)
-        Distributor.mpi_load_in_and_distribute(target_col="total_amount", shuffle=True)
-        X, y = Distributor.get_X_y(target_name="total_amount")
+        # Load in data
+        trainDistributor = MPIDD(train_file_path, readin_chunksize)
+        trainDistributor.mpi_load_in_and_distribute(target_col="total_amount", shuffle=True)
+        X, y = trainDistributor.get_X_y(target_name="total_amount")
         n_local = X.shape[0]
         self.COMM.Barrier()
         print()
@@ -69,45 +69,42 @@ class mpiMLP:
         y = y[tr_idx].reshape(-1, 1).astype(np.float64, copy=False)
         n_local = X.shape[0]
 
-        # Compute batch size (supports fraction or absolute integer)
-        batch_size = int(np.ceil(max(1, batch_portion * n_local)))
-        # Clamp to [1, n_local], and handle tiny shards
-        batch_size = max(1, min(batch_size, n_local))
+        # # Compute batch size (supports fraction or absolute integer)
+        # batch_size = int(np.ceil(max(1, batch_portion * n_local)))
+        # # Clamp to [1, n_local], and handle tiny shards
+        # batch_size = max(1, min(batch_size, n_local))
 
-        # def global_percentiles(x: np.ndarray, qs=(0, 50, 90, 95, 99, 99.5, 99.9)):
-        #     # Build a shared histogram per rank, then allreduce
-        #     # Simple version: compute local percentiles and gather to root for inspection
-        #     loc = np.percentile(x, qs)
-        #     all_loc = None
-        #     if self.RANK == 0:
-        #         all_loc = np.empty((self.SIZE, len(qs)), dtype=np.float64)
-        #     self.COMM.Gather(loc, all_loc, root=0)
-        #     if self.RANK == 0:
-        #         print("[DIAG] y percentiles per rank (qs", qs, "):")
-        #         for r in range(self.SIZE):
-        #             print(f"  rank {r}: {all_loc[r]}")
-        #         # crude global: take min over ranks for low qs, max for high qs
-        #         print("[DIAG] min over ranks at each q:", all_loc.min(axis=0))
-        #         print("[DIAG] max over ranks at each q:", all_loc.max(axis=0))
-        #
-        # global_percentiles(y.ravel(), qs=(0, 50, 90, 95, 99, 99.5, 99.9))
-        # global_percentiles(self.y_val.ravel(), qs=(0, 50, 90, 95, 99, 99.5, 99.9))
+        # Batch size for each process
+        batch_size_proc = batch_size/int(self.SIZE)
+        batch_size_proc = int(batch_size_proc)
+        if self.RANK == 0:
+            print()
+            print(f"Total Batch Size = {batch_size}")
+            print()
+        self.COMM.Barrier()
 
         # Training loop
         print()
-        print(f"Training Starts on Rank {self.RANK} with batch size {batch_size}......")
+        print(f"SGD Starts on Rank {self.RANK} with batch size {batch_size_proc}......")
         print()
+        # wait for timing the training process
+        time_list = []
         for epoch in range(epochs):
             # Sample a local minibatch
-            if batch_size >= n_local:
+            if batch_size_proc >= n_local:
                 idx = np.arange(n_local)
             else:
-                idx = rng.choice(n_local, size=batch_size, replace=False)
+                idx = rng.choice(n_local, size=batch_size_proc, replace=False)
 
             X_bat, y_bat = X[idx], y[idx]
+
+            # Time the start of SGD iteration
+            self.COMM.Barrier()
+            t0 = MPI.Wtime()
+
             # Local gradients
             grad_dict = self.model.compute_batch_grads(X_bat, y_bat)
-            local_training_loss = float(grad_dict["loss"])  # FIX: scalarize for clean compare/print
+            # local_training_loss = float(grad_dict["loss"])  # FIX: scalarize for clean compare/print
 
             # ensure contiguous float64 for MPI
             dW1 = np.ascontiguousarray(grad_dict["dW1"], dtype=np.float64)
@@ -147,6 +144,13 @@ class mpiMLP:
             self.model.W2 -= lr * dW2
             self.model.b2 -= lr * db2
 
+            # Time the end of SGD iteration 
+            self.COMM.Barrier()
+            t1 = MPI.Wtime()
+            local_time = t1 - t0
+            train_time_iter = self.COMM.reduce(local_time, op=MPI.MAX, root=0)
+            time_list.append(train_time_iter)
+
             # LR decay each epoch (as you specified)
             if (lr_decay is not None) and (epoch % lr_resch_stepsize == 0):
                 lr *= lr_decay
@@ -172,13 +176,14 @@ class mpiMLP:
             training_loss_his.append(train_loss)
             validation_loss_his.append(val_loss)
 
-            # Report the loss per 5000 iterations
-            if (epoch % report_per == 0) and (self.RANK==0):
+            # Report the loss per `report_per`
+            if (epoch % report_per == report_per) and (self.RANK==0):
                 print()
                 print(f"Aggregating Losses to Rank {self.RANK}...")
                 print()
                 print(f"{epoch}-th Iteration Training Loss = {train_loss}")
                 print(f"{epoch}-th Iteration Validation Loss = {val_loss}")
+                print()
 
             # Check early stopping using validation loss, trivial computation
             if val_loss < best_data_loss - 1e-10:
@@ -187,10 +192,9 @@ class mpiMLP:
             else:
                 patience_counter += 1
             if patience_counter >= patience:
-                print()
                 print(f"Early Stopping Triggered on Rank {self.RANK} at iter {epoch}...")
-                print()
                 break
+        
         print()
         print(f"Finished Training on Rank {self.RANK}...")
         print()
@@ -213,17 +217,32 @@ class mpiMLP:
                 plt.savefig(save_fig, dpi=300)
                 plt.close()
                 print(f"Training history plot saved as '{save_fig}'")
-        
-        return training_loss_his, validation_loss_his, batch_size
+
+        # Compute the average time for each training iteration
+        SGD_per_iter_time = sum(time_list)/len(time_list)
+
+        return training_loss_his, validation_loss_his, batch_size, SGD_per_iter_time
 
     def mpi_compute_MSE(self, X, y):
-        y_est = self.model.forward(X)
-        err = (y_est - y).ravel()
-        n_local = int(err.size)
-        sse_local = float(np.dot(err, err))
+        # Coerce to NumPy float64
+        X = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
+        if y.ndim == 1:
+            y = y.reshape(-1, 1)
 
+        # Handle empty local shards safely
+        if X.size == 0 or y.size == 0:
+            n_local = 0
+            sse_local = 0.0
+        else:
+            y_est = self.model.forward(X)          # expected shape (N, 1) or (N,)
+            err = (y_est - y).reshape(-1)          # 1D error vector
+            n_local = int(err.size)
+            sse_local = float(np.dot(err, err))
+
+        # Global reductions
         sse_total = self.COMM.reduce(sse_local, op=MPI.SUM, root=0)
-        n_total = self.COMM.reduce(n_local, op=MPI.SUM, root=0)
+        n_total   = self.COMM.reduce(n_local,   op=MPI.SUM, root=0)
 
         if self.RANK == 0:
             if n_total == 0:
@@ -231,11 +250,14 @@ class mpiMLP:
             return sse_total / n_total
 
         return None
+
     
     def compute_RMSE(self, X_test, y_test):
         """Compute the test RMSE with mpi"""
-        # Ensure column vector shape for y
-        y_test = y_test if y_test.ndim == 2 else y_test.reshape(-1, 1)
+        X_test = np.asarray(X_test, dtype=np.float64)
+        y_test = np.asarray(y_test, dtype=np.float64)
+        if y_test.ndim == 1:
+            y_test = y_test.reshape(-1, 1)
         # All procs compute local MSE and agg to rank 0
         test_mse = self.mpi_compute_MSE(X_test, y_test)
         # Rank 0 boardcast MSE to all procs

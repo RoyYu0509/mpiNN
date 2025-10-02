@@ -371,9 +371,10 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
         Tuple of (train_path, test_path, feature_cols)
     """
     print(f"[Rank {RANK}] Starting preprocessing pipeline...")
-    
+    print()
     # Step 1: Load raw data with basic cleaning only (no outlier removal yet)
     print(f"[Rank {RANK}] Step 1: Loading raw data with basic cleaning...")
+    print()
     df_raw = load_and_clean_data_basic(raw_path)
     
     feature_cols = [
@@ -384,11 +385,14 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     df_features = df_raw[feature_cols + ["total_amount"]]
     
     # Step 2: Split into train/test BEFORE preprocessing
+    print()
     print(f"[Rank {RANK}] Step 2: Splitting data into train/test sets...")
+    print()
     train_df_raw, test_df_raw = train_test_split(df_features, test_size=test_size, random_state=random_state)
     
     print(f"[Rank {RANK}] Raw training set shape: {train_df_raw.shape}")
     print(f"[Rank {RANK}] Raw test set shape: {test_df_raw.shape}")
+    print()
     
     # Create outlier configuration
     outlier_config = {
@@ -403,18 +407,23 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     
     # Step 3: Preprocess training set (fit scaler)
     print(f"[Rank {RANK}] Step 3: Preprocessing training set...")
+    print()
     train_df_processed, scaler = preprocess_dataframe(
         train_df_raw, None, outlier_config, feature_cols, fit_scaler=True
     )
     
     # Step 4: Preprocess test set (use fitted scaler)
+    print()
     print(f"[Rank {RANK}] Step 4: Preprocessing test set...")
+    print()
     test_df_processed, _ = preprocess_dataframe(
         test_df_raw, scaler, outlier_config, feature_cols, fit_scaler=False
     )
     
     # Step 5: Save processed datasets
+    print()
     print(f"[Rank {RANK}] Step 5: Saving processed datasets...")
+    print()
     train_df_processed.to_csv(out_train, index=False)
     test_df_processed.to_csv(out_test, index=False)
     
@@ -424,31 +433,33 @@ def preprocess_pipeline(raw_path="nytaxi2022.csv",
     
     print(f"[Rank {RANK}] Training data saved to: {out_train}")
     print(f"[Rank {RANK}] Test data saved to: {out_test}")
+
     
     # Print final summary
     if RANK == 0:
+        print()
         print(f"\n[Rank {RANK}] === PREPROCESSING SUMMARY ===")
         print(f"Original dataset: {df_raw.shape}")
         print(f"Raw train: {train_df_raw.shape} -> Processed train: {train_df_processed.shape}")
         print(f"Raw test: {test_df_raw.shape} -> Processed test: {test_df_processed.shape}")
-        
+        print()
         train_reduction = (len(train_df_raw) - len(train_df_processed)) / len(train_df_raw) * 100
         test_reduction = (len(test_df_raw) - len(test_df_processed)) / len(test_df_raw) * 100
         
         print(f"Train outliers removed: {train_reduction:.2f}%")
         print(f"Test outliers removed: {test_reduction:.2f}%")
         print(f"==============================\n")
-    
+        print()
     return out_train, out_test, feature_cols
 # ------------------------------------------------------------- #
 
-def experiment(act_name, batch_portion, proc_num):
+def experiment(act_name, bat_size, proc_num):
     act_name = act_name
-    batch_portion = batch_portion
+    bat_size = bat_size
     proc_num = proc_num
 
     if RANK == 0:
-        print("[Rank 0] Starting preprocessing pipeline...")
+        # print("[Rank 0] Starting preprocessing pipeline...")
         train_path, test_path, feature_cols = preprocess_pipeline(
             raw_path="nytaxi2022.csv",
             out_train="nytaxi_train.csv",
@@ -480,38 +491,38 @@ def experiment(act_name, batch_portion, proc_num):
     # Train with MPI
     trainer = mpiMLP(model)
 
-    save_fig = f"results/{proc_num}_proc/bat_size{batch_portion}/{act_name}/training_history_{act_name}.png"
+    save_fig = f"results/{proc_num}_proc/bat_size{bat_size}/{act_name}/training_history_{act_name}.png"
 
     if RANK == 0:
         os.makedirs(os.path.dirname(save_fig), exist_ok=True)
 
-    # wait for timing the training process
-    COMM.Barrier()
-    t0 = MPI.Wtime()
+    # Rounding the batch size
+    proc_num_int = int(proc_num)
+    reminder = bat_size%proc_num_int
+    bat_size = bat_size+reminder
 
-    train_losses, val_losses, batch_size = trainer.mpiSGD(
-        file_path=train_path,
+    # SGD Process
+    train_losses, val_losses, batch_size, train_time = trainer.mpiSGD(
+        train_file_path=train_path,
         readin_chunksize=5000,
         valid_portion=0.15,
         lr=1e-3,
         epochs=800,
-        batch_portion=batch_portion,
-        patience=20,
+        batch_size=int(bat_size),
+        patience=10,
         lr_decay=0.95,
         report_per=1,
         lr_resch_stepsize=50,
         save_fig=save_fig
     )
+    print()
+    print(f"Finished SDG in {train_time} seconds")
+    print()
 
-    COMM.Barrier()
-    t1 = MPI.Wtime()
-    local_time = t1 - t0
-    train_time = COMM.reduce(local_time, op=MPI.MAX, root=0)
-
-    # Test evaluation
-    test_df = pd.read_csv(test_path)
-    X_test = test_df[feature_cols].to_numpy(dtype=float)
-    y_test = test_df["total_amount"].to_numpy(dtype=float).reshape(-1, 1)
+    # # Test evaluation
+    # test_df = pd.read_csv(test_path)
+    # X_test = test_df[feature_cols].to_numpy(dtype=float)
+    # y_test = test_df["total_amount"].to_numpy(dtype=float).reshape(-1, 1)
     
     df = pd.DataFrame({
     "epoch": np.arange(1, len(train_losses) + 1),  # add epoch index if needed
@@ -519,12 +530,22 @@ def experiment(act_name, batch_portion, proc_num):
     "val_loss": val_losses
     })
 
-    csv_path = f"results/{proc_num}_proc/bat_size{batch_portion}/{act_name}/loss_record_{act_name}.csv"
+    csv_path = f"results/{proc_num}_proc/bat_size{bat_size}/{act_name}/loss_record_{act_name}.csv"
     if RANK == 0:
         os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     COMM.Barrier()
     df.to_csv(csv_path, index=False)
 
+
+    # Load in testing dataset on RANK 0 and distribute
+    testDistributor = MPIDD(test_path, readin_chunksize=5000)
+    testDistributor.mpi_load_in_and_distribute(target_col="total_amount", shuffle=True)
+    X_test, y_test = testDistributor.get_X_y(target_name="total_amount")
+
+    print()
+    print(f"Computing Test RMSE of {X_test.shape[0]} rows data on Rank {trainer.RANK}")
+    print()
+    # Computing Test RMSE
     COMM.Barrier()
     t0_test = MPI.Wtime()
     test_rmse = trainer.compute_RMSE(X_test, y_test)
@@ -532,6 +553,10 @@ def experiment(act_name, batch_portion, proc_num):
     t1_test = MPI.Wtime()
     local_time = t1_test - t0_test
     test_time = COMM.reduce(local_time, op=MPI.MAX, root=0)
+    print()
+    print(f"Finished Computing RMSE in {test_time} seconds")
+    print()
+
 
     if RANK == 0:
         print("\n========== Results ==========")
@@ -556,7 +581,7 @@ def experiment(act_name, batch_portion, proc_num):
         pass
 
     # Drop large references
-    del trainer, model, train_losses, val_losses, test_df, X_test, y_test, df
+    del trainer, model, train_losses, val_losses, X_test, y_test, df
 
     gc.collect()                   # force Python GC
 

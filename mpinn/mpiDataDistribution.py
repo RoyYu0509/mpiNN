@@ -199,6 +199,9 @@ class MPIDD:
             # if self.RANK == 0:
             #     print(f"Process {self.RANK} finished {root_p_counter}th loading round")
             #     root_p_counter += 1
+        print()
+        print(f"Rank {self.RANK} stores {self.local_data.shape[0]} rows.........")
+        print()
         return
 
 

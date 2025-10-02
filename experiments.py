@@ -17,22 +17,22 @@ if __name__ == "__main__":
         return parser.parse_args()
     
     args = parse_args()
-    bat_por_list = ast.literal_eval(args.batch_portion_list)
+    bat_size_list = ast.literal_eval(args.batch_portion_list)
     act_func_list = ast.literal_eval(args.act_func_list)
     process_number = args.p_num
     rows = []
 
-    for portion in bat_por_list:
+    for batch_size in bat_size_list:
+        batch_size = int(batch_size)
         for act_func in act_func_list:
             # Run experiment
-            train_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size = experiment(act_name=act_func, batch_portion=portion, proc_num=process_number)
+            train_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
             # Store metrics
             if RANK == 0:  # only root collects to avoid duplicates
                 rows.append({
                     "process_num": process_number,
                     "act_func": act_func,
-                    "batch_portion": portion,
-                    "training_time": train_time,
+                    "SGD_per_iter_time": train_time,
                     "testing_time": test_time,
                     "train_rmse": train_rmse,
                     "val_rmse": validation_rmse,
@@ -48,8 +48,8 @@ if __name__ == "__main__":
 
         # Create DataFrame from new rows
         new_df = pd.DataFrame(rows, columns=[
-            "process_num", "act_func", "batch_portion", 
-            "training_time", "testing_time", "train_rmse", 
+            "process_num", "act_func",
+            "SGD_per_iter_time", "testing_time", "train_rmse", 
             "val_rmse", "test_rmse", "batch_size"
         ])
 
