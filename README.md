@@ -20,21 +20,26 @@ conda activate mpipy_mpich
 
 ## Run sub-experiments with one activation function
 ```
-mpiexec -np 1 python -u -m experiments "['relu']" "[1e-9, 5e-9]" 1
-mpiexec -np 2 python -u -m experiments "['relu']" "[1e-9, 5e-9]" 2
-mpiexec -np 3 python -u -m experiments "['relu']" "[1e-9, 5e-9]" 3
+mpiexec -np 1 python -u -m experiments "['relu']" "[240]" 1
+mpiexec -np 2 python -u -m experiments "['relu']" "[240]" 2
+mpiexec -np 3 python -u -m experiments "['relu']" "[240]" 3
+mpiexec -np 4 python -u -m experiments "['relu']" "[240]" 4
+mpiexec -np 5 python -u -m experiments "['relu']" "[240]" 5
 ```
 
 
 ## Run the full experiments on 1, 2, 3 processes
 ```
-mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-9, 5e-9, 1e-8, 5e-8, 1e-7]" 1
-mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-9, 5e-9, 1e-8, 5e-8, 1e-7]" 2
-mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[1e-9, 5e-9, 1e-8, 5e-8, 1e-7]" 3
+mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[60, 120, 180, 240, 300]" 1
+mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[60, 120, 180, 240, 300]" 2
+mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[60, 120, 180, 240, 300]" 3
 ```
 
 # Note:
 - Use MPICH
 - Use Python 3.11
 - Training and evaluation are carried out on a laptop equipped with an Apple M4 Pro processor and 24 GB of memory.
-- GPT interactions for MPI development are all labeled, search for 'GPT' to see the part where we get helps.
+- GPT interactions for MPI development are all labeled, search for 'GPT' to see the part where we get helps. 
+
+
+
