@@ -511,7 +511,7 @@ def experiment(act_name, bat_size, proc_num):
         batch_size=int(bat_size),
         patience=10,
         lr_decay=0.95,
-        report_per=1,
+        report_per=20,
         lr_resch_stepsize=50,
         save_fig=save_fig
     )

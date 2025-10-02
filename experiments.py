@@ -1,4 +1,5 @@
-from MpiTraining import experiment
+# from MpiTraining import experiment
+from mpinn.MpiTraining import experiment
 # from MpiTraining_archived import experiment_arc
 import os, ast, argparse
 from datetime import datetime

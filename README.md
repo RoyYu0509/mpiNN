@@ -28,11 +28,12 @@ mpiexec -np 5 python -u -m experiments "['relu']" "[240]" 5
 ```
 
 
-## Run the full experiments on 1, 2, 3 processes
+## Run the full experiments on 1, 2, 3, 4processes
 ```
-mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[60, 120, 180, 240, 300]" 1
-mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[60, 120, 180, 240, 300]" 2
-mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[60, 120, 180, 240, 300]" 3
+mpiexec -np 1 python -u -m experiments "['relu','sigmoid','tanh']" "[120, 180, 240, 300, 360]" 1
+mpiexec -np 2 python -u -m experiments "['relu','sigmoid','tanh']" "[120, 180, 240, 300, 360]" 2
+mpiexec -np 3 python -u -m experiments "['relu','sigmoid','tanh']" "[120, 180, 240, 300, 360]" 3
+mpiexec -np 4 python -u -m experiments "['relu','sigmoid','tanh']" "[120, 180, 240, 300, 360]" 4
 ```
 
 # Note:
