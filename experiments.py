@@ -27,13 +27,14 @@ if __name__ == "__main__":
         for act_func in act_func_list:
             batch_size = int(batch_size)
             # Run experiment
-            sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, bat_siz = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
+            sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, bat_siz, total_iter = experiment(act_name=act_func, bat_size=batch_size, proc_num=process_number)
             # Store metrics
             if RANK == 0:  # only root collects to avoid duplicates
                 rows.append({
                     "process_num": process_number,
                     "act_func": act_func,
-                    "SGD_100_iter_time": sgd_iter_time*100,
+                    "SGD_iter_time": sgd_iter_time,
+                    "total_iterations": total_iter,
                     "testing_time": test_time,
                     "train_rmse": train_rmse,
                     "val_rmse": validation_rmse,
@@ -49,7 +50,8 @@ if __name__ == "__main__":
         # Create DataFrame from new rows
         new_df = pd.DataFrame(rows, columns=[
             "process_num", "act_func",
-            "SGD_100_iter_time", "testing_time", "train_rmse", 
+            "SGD_iter_time", "total_iterations",
+            "testing_time", "train_rmse", 
             "val_rmse", "test_rmse", "batch_size"
         ])
 

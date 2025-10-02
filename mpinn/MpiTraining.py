@@ -502,7 +502,7 @@ def experiment(act_name, bat_size, proc_num):
     bat_size = bat_size+reminder
 
     # SGD Process
-    train_losses, val_losses, batch_size, sgd_iter_time = trainer.mpiSGD(
+    train_losses, val_losses, batch_size, sgd_iter_time, total_iterations = trainer.mpiSGD(
         train_file_path=train_path,
         readin_chunksize=5000,
         valid_portion=0.15,
@@ -589,9 +589,9 @@ def experiment(act_name, bat_size, proc_num):
     COMM.Barrier()
     
     if RANK == 0:
-        return sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size
+        return sgd_iter_time, test_time, train_rmse, validation_rmse, test_rmse, batch_size, total_iterations
     else:
-        return None, None, None, None, None, None
+        return None, None, None, None, None, None, None
 
 
 if __name__ == "__main__":

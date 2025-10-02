@@ -89,6 +89,8 @@ class mpiMLP:
         print()
         # wait for timing the training process
         time_list = []
+        total_iteration = epochs
+
         for epoch in range(epochs):
             # Sample a local minibatch
             if batch_size_proc >= n_local:
@@ -194,7 +196,9 @@ class mpiMLP:
                 patience_counter += 1
             if patience_counter >= patience:
                 print(f"Early Stopping Triggered on Rank {self.RANK} at iter {epoch}...")
+                total_iteration = epoch
                 break
+
         
         print()
         print(f"Finished Training on Rank {self.RANK}...")
@@ -223,7 +227,7 @@ class mpiMLP:
         time_list = self.COMM.bcast(time_list, root=0)
         SGD_per_iter_time = sum(time_list)/len(time_list)
 
-        return training_loss_his, validation_loss_his, batch_size, SGD_per_iter_time
+        return training_loss_his, validation_loss_his, batch_size, SGD_per_iter_time, total_iteration
 
     def mpi_compute_MSE(self, X, y):
         # Coerce to NumPy float64
