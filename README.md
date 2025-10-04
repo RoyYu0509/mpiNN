@@ -21,13 +21,13 @@ conda activate mpipy_mpich
 # Run Experiment
 Use the following command to run experiment with the interested hyperparameters.
 ```
-mpiexec -np 1 python -u -m experiments "{LIST OF ACT FUNC NAME}" "{LIST OF BATCH SIZE}" {NUMBER OF PROCESSES} {READ IN DATA CHUNK SIZE}
+mpiexec -np {NUMBER OF PROCESSES} python -u -m experiments "{LIST OF ACT FUNC NAME}" "{LIST OF BATCH SIZE}" {NUMBER OF PROCESSES} {READ IN DATA CHUNK SIZE}
 ```
 
 ## Run sub-experiments with one activation function
 ```
-mpiexec -np 2 python -u -m experiments "['relu']" "[660, 1320]" 2 400000
-mpiexec -np 3 python -u -m experiments "['relu']" "[660, 1320]" 3 400000
+mpiexec -np 1 python -u -m experiments "['relu']" "[660]" 1 40000
+mpiexec -np 2 python -u -m experiments "['relu']" "[660]" 2 40000
 ```
 
 
